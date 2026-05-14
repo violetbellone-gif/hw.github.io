@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEI-OS Spiral — Dual-State Evolution v2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F8F9FA;
+    --primary: #0B1A26;
+    --accent: #8B95A0;
+    --accent-warm: #C5A059;
+    --steel: #6B7C88;
+    --muted: #6E7B84;
+    --border: #E2E0DD;
+    --card: #FFFFFF;
+    --subtle: #F3F2F0;
+    --idle-text: #A0A0A0;
+    --active-text: #0B1A26;
+    --highlight: #C5A059;
+    --ease-protocol: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--primary);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ── Scroll stage (provides scroll distance for GSAP pin) ── */
+  .scroll-stage {
+    height: 400vh;
+    position: relative;
+  }
+
+  /* ── Pinned viewport ── */
+  .viewport {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 0 48px;
+    overflow: hidden;
+  }
+
+  /* ── Left: Hero declaration ── */
+  .hero-left {
+    flex: 3;
+    padding-right: 32px;
+    z-index: 10;
+  }
+  .hero-left h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: clamp(2.5rem, 5.5vw, 5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+    color: var(--primary);
+  }
+  .hero-left h1 em {
+    display: block;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--steel);
+    font-size: clamp(1.6rem, 3.4vw, 3rem);
+  }
+  .hero-left p {
+    margin-top: 20px;
+    color: var(--steel);
+    font-size: 1rem;
+    font-weight: 300;
+    font-style: italic;
+    max-width: 380px;
+    line-height: 1.6;
+  }
+
+  /* ── Right: Spiral stage ── */
+  .spiral-right {
+    flex: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .spiral-right svg {
+    width: 100%;
+    max-width: 512px;
+    height: auto;
+  }
+
+  /* ── Idle breathing animation ── */
+  @keyframes breathe {
+    0%, 100% { opacity: 0.28; }
+    50%      { opacity: 0.45; }
+  }
+
+  .zone-line {
+    animation: breathe 5s var(--ease-protocol) infinite;
+  }
+  .zone-line.active {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* ── Text states ── */
+  .zone-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    fill: var(--idle-text);
+    opacity: 0.4;
+    transition: opacity 0.6s var(--ease-protocol), fill 0.6s var(--ease-protocol);
+  }
+  .zone-label.active {
+    opacity: 1;
+    fill: var(--active-text);
+  }
+
+  /* Slide-in: left-offset labels slide LEFT, right-offset labels slide RIGHT */
+  .zone-label.slide-left.activate-slide {
+    animation: slideInLeft 0.6s var(--ease-protocol) forwards;
+  }
+  .zone-label.slide-right.activate-slide {
+    animation: slideInRight 0.6s var(--ease-protocol) forwards;
+  }
+
+  @keyframes slideInLeft {
+    from { transform: translateX(-5px); }
+    to   { transform: translateX(0); }
+  }
+  @keyframes slideInRight {
+    from { transform: translateX(5px); }
+    to   { transform: translateX(0); }
+  }
+
+  /* ── Leader lines: idle = gray translucent, active = gold ── */
+  .leader-line {
+    stroke: var(--accent);
+    stroke-width: 0.5;
+    opacity: 0.2;
+    transition: opacity 0.6s var(--ease-protocol), stroke 0.6s var(--ease-protocol);
+  }
+  .leader-line.active {
+    opacity: 0.8;
+    stroke: var(--highlight);
+  }
+
+  /* ── Golden detector dot ── */
+  .detector-dot {
+    fill: var(--highlight);
+    filter: drop-shadow(0 0 8px rgba(197, 160, 89, 0.7));
+    transition: r 0.4s var(--ease-protocol);
+  }
+
+  /* ── Hot core ── */
+  @keyframes pulse-core {
+    0%, 100% { r: 6.5; opacity: 0.85; }
+    50%      { r: 9.5; opacity: 0.35; }
+  }
+  .hot-core {
+    animation: pulse-core 3.5s var(--ease-protocol) infinite;
+  }
+  .hot-core.active {
+    animation: none;
+    r: 9.5;
+    opacity: 1;
+  }
+
+  /* ── Scroll indicator ── */
+  .scroll-hint {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    z-index: 20;
+    transition: opacity 0.5s;
+  }
+  @keyframes fadeHint {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 0.8; }
+  }
+  .scroll-hint.visible {
+    animation: fadeHint 2s var(--ease-protocol) infinite;
+  }
+
+  /* ── Progress bar ── */
+  .progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    background: var(--highlight);
+    z-index: 100;
+    width: 0%;
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="scroll-stage" id="scrollStage">
+  <div class="viewport" id="viewport">
+    <!-- Left: Hero -->
+    <div class="hero-left">
+      <h1>
+        Engineering Order
+        <em>in Ambiguity</em>
+      </h1>
+      <p>Documents chaos. Synthesizes systems. Navigates across borders, law, and high-stakes protocol.</p>
+    </div>
+
+    <!-- Right: Spiral -->
+    <div class="spiral-right">
+      <svg viewBox="0 0 500 600" fill="none" xmlns="http://www.w3.org/2000/svg" id="spiralSvg">
+
+        <!-- ============ ZONE 1: Isolated Ambiguity (Bottom) ============ -->
+
+        <!-- Zone 1 geometry shapes (for spatial avoidance calculation) -->
+        <!-- Main ellipse: cx=250, cy=490, rx=85, ry=45 → left edge at x=165 -->
+        <!-- Inner ellipse: cx=245, cy=485, rx=65, ry=32 → left edge at x=180 -->
+
+        <!-- Chaotic jagged paths -->
+        <path d="M 180 530 L 175 520 L 185 510 L 170 495 L 190 485"
+              stroke="#8B95A0" stroke-width="0.7" fill="none" opacity="0.28"
+              class="zone-line" data-zone="1" data-active-sw="1.2" />
+        <path d="M 310 525 L 320 515 L 305 505 L 325 490 L 310 480"
+              stroke="#6B7C88" stroke-width="0.6" fill="none" opacity="0.28"
+              class="zone-line" data-zone="1" data-active-sw="1.1" />
+        <path d="M 200 500 L 210 490 L 195 475 L 215 465 L 195 455"
+              stroke="#8B95A0" stroke-width="0.6" fill="none" opacity="0.28"
+              class="zone-line" data-zone="1" data-active-sw="1.1" />
+        <path d="M 300 495 L 290 485 L 305 475 L 285 460 L 305 450"
+              stroke="#6B7C88" stroke-width="0.6" fill="none" opacity="0.28"
+              class="zone-line" data-zone="1" data-active-sw="1.1" />
+
+        <!-- Irregular ellipses -->
+        <ellipse cx="250" cy="490" rx="85" ry="45"
+                 stroke="#8B95A0" stroke-width="0.7" stroke-dasharray="3 5"
+                 fill="none" opacity="0.28"
+                 class="zone-line" data-zone="1" data-active-sw="1.2" />
+        <ellipse cx="245" cy="485" rx="65" ry="32" transform="rotate(-8 245 485)"
+                 stroke="#6B7C88" stroke-width="0.5" stroke-dasharray="6 4"
+                 fill="none" opacity="0.28"
+                 class="zone-line" data-zone="1" data-active-sw="1" />
+
+        <!-- Zone 1 label — LEFT (x computed in JS for spatial avoidance) -->
+        <text x="20" y="495" class="zone-label slide-left" data-zone="1"
+              data-side="left" data-shape-left="165" id="zone1Label">
+          Isolated Ambiguity
+        </text>
+
+        <!-- Leader line Z1: label right-edge → ellipse left-anchor -->
+        <line x1="0" y1="492" x2="0" y2="480"
+              class="leader-line" data-zone="1" id="leader1" />
+
+        <!-- ============ ZONE 2: Documentation & Radical Reflection (Middle) ============ -->
+
+        <!-- Main ellipse: cx=250, cy=370, rx=80, ry=55 → right edge at x=330 -->
+
+        <!-- Smoothing ellipses -->
+        <ellipse cx="250" cy="370" rx="80" ry="55"
+                 stroke="#8B95A0" stroke-width="0.85" stroke-dasharray="10 4"
+                 fill="none" opacity="0.28"
+                 class="zone-line" data-zone="2" data-active-sw="1.35" />
+        <ellipse cx="248" cy="368" rx="60" ry="38"
+                 stroke="#6B7C88" stroke-width="0.7" stroke-dasharray="15 5"
+                 fill="none" opacity="0.28"
+                 class="zone-line" data-zone="2" data-active-sw="1.2" />
+
+        <!-- Cross-connecting lines -->
+        <line x1="190" y1="350" x2="310" y2="390"
+              stroke="#8B95A0" stroke-width="0.5" opacity="0.28"
+              class="zone-line" data-zone="2" data-active-sw="1" />
+        <line x1="310" y1="350" x2="190" y2="390"
+              stroke="#6B7C88" stroke-width="0.5" opacity="0.28"
+              class="zone-line" data-zone="2" data-active-sw="1" />
+
+        <!-- Aligned nodes -->
+        <circle cx="190" cy="350" r="3" fill="#8B95A0" opacity="0.28"
+                class="zone-line" data-zone="2" />
+        <circle cx="310" cy="350" r="3" fill="#8B95A0" opacity="0.28"
+                class="zone-line" data-zone="2" />
+        <circle cx="190" cy="390" r="3" fill="#6B7C88" opacity="0.28"
+                class="zone-line" data-zone="2" />
+        <circle cx="310" cy="390" r="3" fill="#6B7C88" opacity="0.28"
+                class="zone-line" data-zone="2" />
+
+        <!-- Zone 2 labels — RIGHT (x computed in JS) -->
+        <text x="345" y="365" class="zone-label slide-right" data-zone="2"
+              data-side="right" data-shape-right="330" id="zone2LabelA">
+          Documentation &amp;
+        </text>
+        <text x="345" y="383" class="zone-label slide-right" data-zone="2"
+              data-side="right" data-shape-right="330" id="zone2LabelB">
+          Radical Reflection
+        </text>
+
+        <!-- Leader line Z2: label left-edge → ellipse right-anchor -->
+        <line x1="0" y1="370" x2="0" y2="390"
+              class="leader-line" data-zone="2" id="leader2" />
+
+        <!-- ============ ZONE 3: Cognitive Closed-loop (Top) ============ -->
+
+        <!-- Outer circle: cx=250, cy=240, r=70 → left edge at x=180 -->
+
+        <!-- Concentric circles -->
+        <circle cx="250" cy="240" r="70"
+                stroke="#8B95A0" stroke-width="0.85" fill="none" opacity="0.28"
+                class="zone-line" data-zone="3" data-active-sw="1.35" />
+        <circle cx="250" cy="240" r="52"
+                stroke="#6B7C88" stroke-width="0.7" fill="none" opacity="0.28"
+                class="zone-line" data-zone="3" data-active-sw="1.2" />
+        <circle cx="250" cy="240" r="34"
+                stroke="#8B95A0" stroke-width="0.6" fill="none" opacity="0.28"
+                class="zone-line" data-zone="3" data-active-sw="1.1" />
+
+        <!-- Geometric cross lines -->
+        <line x1="215" y1="205" x2="285" y2="275"
+              stroke="#8B95A0" stroke-width="0.5" opacity="0.28"
+              class="zone-line" data-zone="3" data-active-sw="1" />
+        <line x1="285" y1="205" x2="215" y2="275"
+              stroke="#6B7C88" stroke-width="0.5" opacity="0.28"
+              class="zone-line" data-zone="3" data-active-sw="1" />
+
+        <!-- Precise nodes -->
+        <g>
+          <circle cx="284" cy="240" r="3.3" fill="#8B95A0" opacity="0.28"
+                  class="zone-line" data-zone="3" />
+          <circle cx="216" cy="240" r="3.3" fill="#8B95A0" opacity="0.28"
+                  class="zone-line" data-zone="3" />
+          <circle cx="250" cy="274" r="3.3" fill="#8B95A0" opacity="0.28"
+                  class="zone-line" data-zone="3" />
+          <circle cx="250" cy="206" r="3.3" fill="#8B95A0" opacity="0.28"
+                  class="zone-line" data-zone="3" />
+        </g>
+
+        <!-- Zone 3 labels — LEFT (x computed in JS) -->
+        <text x="18" y="235" class="zone-label slide-left" data-zone="3"
+              data-side="left" data-shape-left="180" id="zone3LabelA">
+          Cognitive Closed-loop
+        </text>
+        <text x="18" y="253" class="zone-label slide-left" data-zone="3"
+              data-side="left" data-shape-left="180" id="zone3LabelB">
+          &amp; Scalable Execution
+        </text>
+
+        <!-- Leader lines Z3: label right-edge → circle left-anchor -->
+        <line x1="0" y1="236" x2="0" y2="240"
+              class="leader-line" data-zone="3" id="leader3a" />
+        <line x1="0" y1="252" x2="0" y2="248"
+              class="leader-line" data-zone="3" id="leader3b" />
+
+        <!-- ============ Spiral Thread ============ -->
+        <path id="spiralPath"
+              d="M 250 510
+                 C 240 495, 220 480, 225 460
+                 C 230 440, 260 445, 265 420
+                 C 270 395, 230 390, 235 365
+                 C 240 340, 270 335, 265 310
+                 C 260 285, 230 280, 240 258
+                 C 250 236, 265 245, 250 240"
+              stroke="#C5A059" stroke-width="1.1" fill="none" opacity="0.5"
+              class="zone-line" data-zone="all" data-active-sw="1.6" />
+
+        <!-- ============ Golden Detector ============ -->
+        <!-- Rendered BEFORE labels in DOM so labels render on top (z-index via paint order) -->
+        <circle id="detector" cx="250" cy="510" r="5"
+                class="detector-dot" />
+
+        <!-- ============ Hot Core ============ -->
+        <circle cx="250" cy="240" r="6.5" fill="#C5A059"
+                class="hot-core" id="hotCore" />
+
+        <!-- Satellite dots -->
+        <g opacity="0.28" class="zone-line" data-zone="all">
+          <circle cx="155" cy="530" r="1.5" fill="#8B95A0" />
+          <circle cx="340" cy="520" r="1.5" fill="#8B95A0" />
+          <circle cx="165" cy="460" r="1.5" fill="#8B95A0" />
+          <circle cx="335" cy="455" r="1.5" fill="#8B95A0" />
+          <circle cx="175" cy="395" r="1.5" fill="#8B95A0" />
+          <circle cx="325" cy="385" r="1.5" fill="#8B95A0" />
+          <circle cx="185" cy="305" r="1.5" fill="#8B95A0" />
+          <circle cx="315" cy="300" r="1.5" fill="#8B95A0" />
+          <circle cx="200" cy="270" r="1.5" fill="#8B95A0" />
+          <circle cx="300" cy="268" r="1.5" fill="#8B95A0" />
+        </g>
+
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div class="scroll-hint visible" id="scrollHint">Scroll to activate the spiral</div>
+
+<!-- GSAP + ScrollTrigger -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+<script>
+(function() {
+  gsap.registerPlugin(ScrollTrigger);
+
+  const spiralPath = document.getElementById('spiralPath');
+  const detector = document.getElementById('detector');
+  const hotCore = document.getElementById('hotCore');
+  const progressBar = document.getElementById('progressBar');
+  const scrollHint = document.getElementById('scrollHint');
+
+  const pathLength = spiralPath.getTotalLength();
+
+  // ── Spatial avoidance: position text outside shape boundaries ──
+  const GAP_MIN = 18; // minimum px gap (in SVG viewBox units) between text and shape
+
+  function calcTextPositions() {
+    document.querySelectorAll('.zone-label').forEach(label => {
+      const side = label.dataset.side;
+      const shapeLeft = parseFloat(label.dataset.shapeLeft);
+      const shapeRight = parseFloat(label.dataset.shapeRight);
+
+      // Measure actual text width in SVG coordinate space
+      const bbox = label.getBBox();
+      const textW = bbox.width;
+
+      if (side === 'left' && !isNaN(shapeLeft)) {
+        // Text sits LEFT of shape. Text right-edge must be ≤ shapeLeft - GAP_MIN
+        const newX = Math.max(8, shapeLeft - GAP_MIN - textW);
+        label.setAttribute('x', newX);
+      } else if (side === 'right' && !isNaN(shapeRight)) {
+        // Text sits RIGHT of shape. Text left-edge must be ≥ shapeRight + GAP_MIN
+        const newX = shapeRight + GAP_MIN;
+        label.setAttribute('x', newX);
+      }
+    });
+  }
+
+  // ── Update leader line endpoints after text repositioning ──
+  function calcLeaderLines() {
+    const mappings = [
+      // { leaderId, labelId, anchorX, anchorY } — anchor is the shape-side attachment point
+      { leader: 'leader1', label: 'zone1Label', ax: 185, ay: 480 },
+      { leader: 'leader2', label: 'zone2LabelA', ax: 310, ay: 390 },
+      { leader: 'leader3a', label: 'zone3LabelA', ax: 194, ay: 240 },
+      { leader: 'leader3b', label: 'zone3LabelB', ax: 194, ay: 248 },
+    ];
+
+    mappings.forEach(({ leader, label, ax, ay }) => {
+      const leaderEl = document.getElementById(leader);
+      const labelEl = document.getElementById(label);
+      if (!leaderEl || !labelEl) return;
+
+      const bbox = labelEl.getBBox();
+      const labelSide = labelEl.dataset.side;
+
+      // Determine which edge of the text to connect from
+      let lx;
+      if (labelSide === 'left') {
+        lx = bbox.x + bbox.width; // right edge of text
+      } else {
+        lx = bbox.x; // left edge of text
+      }
+      const ly = bbox.y + bbox.height / 2; // vertical center of text
+
+      leaderEl.setAttribute('x1', lx);
+      leaderEl.setAttribute('y1', ly);
+      leaderEl.setAttribute('x2', ax);
+      leaderEl.setAttribute('y2', ay);
+    });
+  }
+
+  // ── Zone activation thresholds (as fraction of spiral path, bottom→top) ──
+  const zoneBounds = {
+    1: { start: 0.02, end: 0.30 },
+    2: { start: 0.28, end: 0.68 },
+    3: { start: 0.62, end: 1.0  },
+  };
+
+  const activeZones = new Set();
+  const zoneLines = document.querySelectorAll('.zone-line');
+  const zoneLabels = document.querySelectorAll('.zone-label');
+  const leaderLines = document.querySelectorAll('.leader-line');
+
+  function updateSpiral(progress) {
+    // Clamp
+    const p = Math.max(0, Math.min(1, progress));
+
+    // Progress bar
+    progressBar.style.width = (p * 100) + '%';
+
+    // Dot position along spiral path (0 = bottom, 1 = top)
+    const pathPos = pathLength * p;
+    const point = spiralPath.getPointAtLength(pathPos);
+    detector.setAttribute('cx', point.x);
+    detector.setAttribute('cy', point.y);
+
+    // Determine active zones
+    const newActive = new Set();
+    for (const [zone, bounds] of Object.entries(zoneBounds)) {
+      if (p >= bounds.start && p <= bounds.end) {
+        newActive.add(zone);
+      }
+    }
+    // Zone 3 stays lit once reached
+    if (p > 0.6) newActive.add('3');
+
+    applyZoneStates(newActive, p);
+
+    // Hot core ignition
+    if (p > 0.85) {
+      hotCore.classList.add('active');
+    } else {
+      hotCore.classList.remove('active');
+    }
+
+    // Hide scroll hint
+    if (p > 0.03) {
+      scrollHint.classList.remove('visible');
+      scrollHint.style.opacity = '0';
+    }
+  }
+
+  function applyZoneStates(newZones) {
+    for (const zone of activeZones) {
+      if (!newZones.has(zone)) deactivateZone(zone);
+    }
+    for (const zone of newZones) {
+      if (!activeZones.has(zone)) activateZone(zone);
+    }
+    activeZones.clear();
+    for (const z of newZones) activeZones.add(z);
+  }
+
+  function activateZone(zone) {
+    zoneLines.forEach(el => {
+      if (el.dataset.zone === zone || el.dataset.zone === 'all') {
+        el.classList.add('active');
+        const sw = el.dataset.activeSw;
+        if (sw) el.style.strokeWidth = sw + 'px';
+      }
+    });
+
+    zoneLabels.forEach(el => {
+      if (el.dataset.zone === zone) {
+        el.classList.add('active', 'activate-slide');
+      }
+    });
+
+    leaderLines.forEach(el => {
+      if (el.dataset.zone === zone) {
+        el.classList.add('active');
+      }
+    });
+  }
+
+  function deactivateZone(zone) {
+    zoneLines.forEach(el => {
+      if (el.dataset.zone === zone) {
+        el.classList.remove('active');
+        el.style.strokeWidth = '';
+      }
+    });
+
+    zoneLabels.forEach(el => {
+      if (el.dataset.zone === zone) {
+        el.classList.remove('active', 'activate-slide');
+      }
+    });
+
+    leaderLines.forEach(el => {
+      if (el.dataset.zone === zone) {
+        el.classList.remove('active');
+      }
+    });
+  }
+
+  // ── Initialize: measure text, position, draw leader lines ──
+  function initLayout() {
+    calcTextPositions();
+    calcLeaderLines();
+  }
+
+  // Run after fonts load so getBBox() is accurate
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(initLayout);
+  } else {
+    setTimeout(initLayout, 300);
+  }
+
+  // ── GSAP ScrollTrigger: pin viewport, map scroll 100% → dot displacement ──
+  ScrollTrigger.create({
+    trigger: "#scrollStage",
+    start: "top top",
+    end: "bottom bottom",
+    pin: "#viewport",
+    scrub: 0.5,         // smooth catch-up (0.5s lag for "thinking weight")
+    onUpdate: (self) => {
+      updateSpiral(self.progress);
+    }
+  });
+
+  // Initial render
+  updateSpiral(0);
+
+  console.log('LEI-OS v2.0 — GSAP pinning active. Path length:', pathLength.toFixed(1));
+})();
+</script>
+
+</body>
+</html>
